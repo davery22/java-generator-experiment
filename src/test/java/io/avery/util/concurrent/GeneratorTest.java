@@ -5,16 +5,14 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 class GeneratorTest {
     @Test
-    void testBasics() throws InterruptedException, ExecutionException {
+    void testBasics() throws InterruptedException {
         try (var exec = Executors.newVirtualThreadPerTaskExecutor();
              var gen = new Generator<>(exec, GeneratorTest::generate1)
         ) {
@@ -23,7 +21,7 @@ class GeneratorTest {
             
             var expected = IntStream.range(0, 10).flatMap(i -> IntStream.range(0, 10)).boxed().toList();
             assertEquals(expected, actual);
-            assertNull(gen.future().get());
+            assertEquals("Hello, World!", gen.future().resultNow());
         }
     }
     
@@ -44,10 +42,11 @@ class GeneratorTest {
         }
     }
     
-    private static void generate1(Channel<Void, Integer> chan) throws InterruptedException {
+    private static String generate1(Channel<Void, Integer> chan) throws InterruptedException {
         for (int i = 0; i < 10; i++) {
             Generators.yieldAll(chan, GeneratorTest::generate2);
         }
+        return "Hello, World!";
     }
     
     private static void generate2(Channel<Void, Integer> chan) throws InterruptedException {

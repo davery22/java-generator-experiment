@@ -1,73 +1,90 @@
 package io.avery.util.concurrent;
 
-import java.util.Spliterators;
-import java.util.concurrent.ExecutionException;
+import java.util.Objects;
 import java.util.concurrent.Executors;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
+import java.util.concurrent.Future;
 
+/**
+ * Utility methods for {@link Generator}.
+ */
 public class Generators {
     private Generators() {} // Utility
     
-    private static final Consumer<Object> NOP = item -> {};
-    
-    @SuppressWarnings("unchecked")
-    public static <T> Consumer<T> nop() { return (Consumer<T>) NOP; }
-    
+    /**
+     * Returns a {@link GeneratorCallable} object that, when called, runs the given generator task and returns the given
+     * result. This is analogous to {@link Executors#callable}.
+     *
+     * @throws NullPointerException if task is null
+     */
     public static <In, Out, R> GeneratorCallable<In, Out, R> callable(GeneratorRunnable<In, Out> generator, R result) {
+        Objects.requireNonNull(generator);
         return chan -> { generator.run(chan); return result; };
     }
     
-    private static class GeneratorSpliterator<T> extends Spliterators.AbstractSpliterator<T> {
-        private final Generator<Void, T, ?> generator;
-        
-        GeneratorSpliterator(Generator<Void, T, ?> generator) {
-            super(Long.MAX_VALUE, 0);
-            this.generator = generator;
-        }
-        
-        @Override
-        public boolean tryAdvance(Consumer<? super T> action) {
-            try {
-                return generator.next(null, action);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IllegalStateException(e); // TODO: idk
-            }
-        }
-    }
-    public static <T> Stream<T> stream(Generator<Void, T, ?> generator) {
-        return StreamSupport.stream(new GeneratorSpliterator<>(generator), false);
-    }
-    
-    public static <Out> Void yieldAll(
+    /**
+     * Yields all elements from the given generator task to the given channel, and returns the generator's future
+     * result.
+     *
+     * <p>The generator task is wrapped to return {@code null}, and executed in a new virtual thread executor. The
+     * generator task is always complete when this method returns.
+     *
+     * @throws InterruptedException if the Thread is interrupted while yielding or waiting for the generator to yield
+     */
+    public static <Out> Future<Void> yieldAll(
         Channel<Void, Out> chan,
         GeneratorRunnable<Void, Out> generatorRunnable
-    ) throws ExecutionException, InterruptedException {
+    ) throws InterruptedException {
         return yieldAll(chan, Generators.callable(generatorRunnable, null));
     }
     
-    public static <Out, R> R yieldAll(
+    /**
+     * Yields all elements from the given generator task to the given channel, and returns the generator's future
+     * result.
+     *
+     * <p>The generator task is executed in a new virtual thread executor. The generator task is always complete when
+     * this method returns.
+     *
+     * @throws InterruptedException if the Thread is interrupted while yielding or waiting for the generator to yield
+     */
+    public static <Out, R> Future<R> yieldAll(
         Channel<Void, Out> chan,
         GeneratorCallable<Void, Out, R> generatorCallable
-    ) throws ExecutionException, InterruptedException {
-        try (var exec = Executors.newVirtualThreadPerTaskExecutor();
-             var generator = new Generator<>(exec, generatorCallable)
-        ) {
-            return yieldAll(chan, generator);
+    ) throws InterruptedException {
+        try (var exec = Executors.newVirtualThreadPerTaskExecutor()) {
+            return yieldAll(chan, new Generator<>(exec, generatorCallable));
         }
     }
     
-    @SuppressWarnings("unchecked")
-    public static <Out, R> R yieldAll(
+    /**
+     * Yields all elements from the given generator to the given channel, and returns the generator's future result.
+     *
+     * <p>The generator is always closed when this method returns.
+     *
+     * @throws InterruptedException if the Thread is interrupted while yielding or waiting for the generator to yield
+     */
+    public static <Out, R> Future<R> yieldAll(
         Channel<Void, Out> chan,
         Generator<Void, Out, R> generator
-    ) throws ExecutionException, InterruptedException {
-        Object[] box = { null };
-        while (generator.next(null, i -> box[0] = i)) {
-            chan.yield((Out) box[0]);
+    ) throws InterruptedException {
+        // Wrap-and-unwrap the checked exception, to circumvent the no-exception signature of Consumer.
+        // Alternatively, we could use a box with interior mutability, then yield outside next. Not sure which is more performant.
+        try (var gen = generator) {
+            while (gen.next(null, i -> {
+                try {
+                    chan.yield(i);
+                } catch (InterruptedException e) {
+                    throw new UncheckedInterruptedException(e);
+                }
+            })) ;
+            return gen.future();
+        } catch (UncheckedInterruptedException e) {
+            throw (InterruptedException) e.getCause();
         }
-        return generator.result().get();
+    }
+    
+    private static class UncheckedInterruptedException extends RuntimeException {
+        UncheckedInterruptedException(InterruptedException e) {
+            super(e);
+        }
     }
 }

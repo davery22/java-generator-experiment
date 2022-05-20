@@ -1,10 +1,7 @@
 package io.avery.util.concurrent;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -13,25 +10,6 @@ import java.util.stream.IntStream;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GeneratorTest {
-    
-    @Disabled
-    @Test
-    void testPerformance() throws InterruptedException {
-        // Try changing this to Executors.newSingleThreadExecutor()
-        try (var exec = Executors.newVirtualThreadPerTaskExecutor();
-             var gen = new Generator<>(exec, (Channel<Void, Integer> chan) -> {
-                 for (int i = 0; i < 1000000; i++) chan.yield(i);
-             })
-        ) {
-            Instant start = Instant.now();
-            
-            long[] sum = { 0 };
-            while (gen.next(null, i -> sum[0] += i)) ;
-            
-            Instant end = Instant.now();
-            System.out.printf("Sum: %d, Elapsed: %s%n", sum[0], Duration.between(start, end));
-        }
-    }
     
     @Test
     void testNormalResult() throws InterruptedException {
@@ -98,6 +76,7 @@ class GeneratorTest {
                 gen.next(null, actual::add);
             }
             gen.close();
+            
             assertFalse(gen.next(null, actual::add));
             assertEquals(List.of(0, 1, 2), actual);
             assertTrue(gen.future().isCancelled());
@@ -112,6 +91,7 @@ class GeneratorTest {
             List<Integer> actual = new ArrayList<>();
             while (gen.next(null, actual::add));
             gen.close();
+            
             assertEquals(IntStream.range(0, 10).boxed().toList(), actual);
             assertNull(gen.future().resultNow());
         }

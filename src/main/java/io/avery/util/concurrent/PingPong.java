@@ -52,7 +52,6 @@ public class PingPong<In, Out> {
         return pong;
     }
     
-    
     /**
      * The Ping side of a {@link PingPong}.
      */
@@ -106,7 +105,7 @@ public class PingPong<In, Out> {
         /**
          * Wakes up a waiting Ping-side, passing the given value to it, and suspending until one of 2 events happens:
          * <ul>
-         *     <li>The ping-side calls {@link Ping#next(Object, Consumer) next()}, passing in a value that is returned
+         *     <li>The Ping-side calls {@link Ping#next(Object, Consumer) next()}, passing in a value that is returned
          *     from this method.
          *     <li>The thread is interrupted, and this method throws InterruptedException.
          * </ul>

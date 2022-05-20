@@ -3,11 +3,12 @@ package io.avery.util.concurrent;
 import java.util.function.Consumer;
 
 /**
- * Spin-loop implementation of PingPong, used to strip down the overhead of synchronization and context-switching.
+ * Hacky experiment #1: Spin-loop implementation of PingPong, used to strip down the overhead of synchronization and
+ * context-switching.
  *
  * Takeaway: Without the overhead, Generator has performance comparable to Python generators.
  */
-public class _unusedPingPongSpin<In, Out> {
+public class _unusedSpinPingPong<In, Out> {
     private enum State { NEW, RUNNING, YIELDING, DONE }
     
     private final Ping ping = new Ping();
@@ -21,12 +22,12 @@ public class _unusedPingPongSpin<In, Out> {
     public class Ping {
         @SuppressWarnings("unchecked")
         public boolean next(In item, Consumer<? super Out> action) {
-            while (state == State.NEW) ;
+            while (state == State.NEW) Thread.onSpinWait();
             if (state == State.DONE) return false;
             // assert state == State.YIELDING;
             value = item;
             state = State.RUNNING;
-            while (state == State.RUNNING) ;
+            while (state == State.RUNNING) Thread.onSpinWait();
             if (state == State.DONE) return false;
             // assert state == State.YIELDING;
             action.accept((Out) value);
@@ -40,7 +41,7 @@ public class _unusedPingPongSpin<In, Out> {
             // assert state == State.RUNNING || state == State.NEW;
             value = item;
             state = State.YIELDING;
-            while (state == State.YIELDING) ;
+            while (state == State.YIELDING) Thread.onSpinWait();
             // assert state == State.RUNNING;
             return (In) value;
         }

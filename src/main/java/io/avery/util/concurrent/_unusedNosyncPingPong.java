@@ -5,12 +5,12 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.function.Consumer;
 
 /**
- * Hacky implementation of PingPong, used to strip down the overhead of synchronization, so that we just see the
- * overhead of context-switching.
+ * Hacky experiment #2: Un-synchronized implementation of PingPong, used to strip down the overhead of synchronization
+ * so that we just see the overhead of context-switching.
  *
  * Takeaway: Context-switching is by far the larger overhead.
  */
-public class _unusedPingPongHack<In, Out> {
+public class _unusedNosyncPingPong<In, Out> {
     private enum State { NEW, RUNNING, YIELDING, DONE }
     
     private final Ping ping = new Ping();

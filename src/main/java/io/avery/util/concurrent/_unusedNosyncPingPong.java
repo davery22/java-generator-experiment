@@ -2,7 +2,6 @@ package io.avery.util.concurrent;
 
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
-import java.util.function.Consumer;
 
 /**
  * Hacky experiment #2: Un-synchronized implementation of PingPong, used to strip down the overhead of synchronization
@@ -24,14 +23,14 @@ public class _unusedNosyncPingPong<In, Out> {
     
     public class Ping {
         @SuppressWarnings("unchecked")
-        public boolean next(In item, Consumer<? super Out> action) {
+        public Out next(In item) {
                 // Only set me to the waiter if there is no other waiter yet.
                 // Success implies that state == NEW and the other thread has not attempted setting.
                 Thread me = Thread.currentThread();
                 waiter.compareAndSet(null, me);
 
             while (state == State.NEW) LockSupport.park();
-            if (state == State.DONE) return false;
+            if (state == State.DONE) return null;
 
                 // At this point we know that another thread is the waiter,
                 // because the state == YIELDING
@@ -44,10 +43,9 @@ public class _unusedNosyncPingPong<In, Out> {
                 LockSupport.unpark(prevWaiter);
 
             while (state == State.RUNNING) LockSupport.park();
-            if (state == State.DONE) return false;
+            if (state == State.DONE) return null;
             // assert state == State.YIELDING
-            action.accept((Out) value);
-            return true;
+            return (Out) value;
         }
     }
     

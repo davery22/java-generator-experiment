@@ -14,11 +14,13 @@ public class Main {
         ) {
             Instant start = Instant.now();
         
-            long[] sum = { 0 };
-            while (gen.next(null, i -> sum[0] += i)) ;
+            long sum = 0;
+            for (Integer n; (n = gen.next(null)) != null;) {
+                sum += n;
+            }
         
             Instant end = Instant.now();
-            System.out.printf("Sum: %d, Elapsed: %s%n", sum[0], Duration.between(start, end));
+            System.out.printf("Sum: %d, Elapsed: %s%n", sum, Duration.between(start, end));
         }
     }
 }

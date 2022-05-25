@@ -16,12 +16,10 @@ class GeneratorTest {
         try (var exec = Executors.newVirtualThreadPerTaskExecutor();
              var gen = new Generator<>(exec, GeneratorTest::greeter)
         ) {
-            StringBuilder sb = new StringBuilder();
-            gen.next(null, sb::append);
-            gen.next("Salutations", sb::append);
-            gen.next("Planet", sb::append);
+            String out = gen.next(null) + gen.next("Salutations");
+            gen.next("Planet");
         
-            assertEquals("Greeting?Name?", sb.toString());
+            assertEquals("Greeting?Name?", out);
             assertEquals("Salutations, Planet!", gen.future().resultNow());
         }
     }
@@ -31,12 +29,10 @@ class GeneratorTest {
         try (var exec = Executors.newVirtualThreadPerTaskExecutor();
              var gen = new Generator<>(exec, GeneratorTest::greeter)
         ) {
-            StringBuilder sb = new StringBuilder();
-            gen.next(null, sb::append);
-            gen.next("Hello", sb::append);
-            gen.next("World", sb::append);
+            String out = gen.next(null) + gen.next("Hello");
+            gen.next("World");
             
-            assertEquals("Greeting?Name?", sb.toString());
+            assertEquals("Greeting?Name?", out);
             assertInstanceOf(StaleGreetingException.class, gen.future().exceptionNow());
         }
     }
@@ -45,23 +41,19 @@ class GeneratorTest {
     void testTwoWayCommunication() throws InterruptedException {
        try (var exec = Executors.newVirtualThreadPerTaskExecutor();
             var gen = new Generator<>(exec, (Channel<Integer, Integer> chan) -> {
-                int steps = 0;
                 int num = chan.yield(1);
-                while (steps < 10) {
+                for (int steps = 0; steps < 10; steps++) {
                     num = chan.yield(num * 2);
-                    steps++;
                 }
-                return steps;
+                return 10;
             })
        ) {
-           class Box { int n; }
-           Box box = new Box();
+           int n = gen.next(null);
+           for (Integer nn; (nn = gen.next(n + 3)) != null;) {
+               n = nn;
+           }
            
-           gen.next(null, i -> box.n = i);
-           
-           while (gen.next(box.n + 3, i -> box.n = i)) ;
-           
-           assertEquals(7162, box.n);
+           assertEquals(7162, n);
            assertEquals(10, gen.future().resultNow());
        }
     }
@@ -71,13 +63,13 @@ class GeneratorTest {
         try (var exec = Executors.newVirtualThreadPerTaskExecutor();
              var gen = new Generator<>(exec, GeneratorTest::counter)
         ) {
-            List<Integer> actual = new ArrayList<>();
+            var actual = new ArrayList<Integer>();
             for (int i = 0; i < 3; i++) {
-                gen.next(null, actual::add);
+                actual.add(gen.next(null));
             }
             gen.close();
             
-            assertFalse(gen.next(null, actual::add));
+            assertNull(gen.next(null));
             assertEquals(List.of(0, 1, 2), actual);
             assertTrue(gen.future().isCancelled());
         }
@@ -88,11 +80,15 @@ class GeneratorTest {
         try (var exec = Executors.newVirtualThreadPerTaskExecutor();
              var gen = new Generator<>(exec, GeneratorTest::counter)
         ) {
-            List<Integer> actual = new ArrayList<>();
-            while (gen.next(null, actual::add));
+            var actual = new ArrayList<Integer>();
+            for (Integer num; (num = gen.next(null)) != null;) {
+                actual.add(num);
+            }
             gen.close();
             
+            assertNull(gen.next(null));
             assertEquals(IntStream.range(0, 10).boxed().toList(), actual);
+            assertFalse(gen.future().isCancelled());
             assertNull(gen.future().resultNow());
         }
     }
@@ -103,7 +99,9 @@ class GeneratorTest {
              var gen = new Generator<>(exec, GeneratorTest::repeater)
         ) {
             var actual = new ArrayList<Integer>();
-            while (gen.next(null, actual::add)) ;
+            for (Integer num; (num = gen.next(null)) != null;) {
+                actual.add(num);
+            }
             
             var expected = IntStream.range(0, 10).flatMap(i -> IntStream.range(0, 10)).boxed().toList();
             assertEquals(expected, actual);

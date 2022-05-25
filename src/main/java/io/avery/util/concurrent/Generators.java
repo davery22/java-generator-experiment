@@ -66,25 +66,11 @@ public class Generators {
         Channel<Void, Out> chan,
         Generator<Void, Out, R> generator
     ) throws InterruptedException {
-        // Wrap-and-unwrap the checked exception, to circumvent the no-exception signature of Consumer.
-        // Alternatively, we could use a box with interior mutability, then yield outside next. Not sure which is more performant.
         try (var gen = generator) {
-            while (gen.next(null, i -> {
-                try {
-                    chan.yield(i);
-                } catch (InterruptedException e) {
-                    throw new UncheckedInterruptedException(e);
-                }
-            })) ;
+            for (Out value; (value = gen.next(null)) != null;) {
+                chan.yield(value);
+            }
             return gen.future();
-        } catch (UncheckedInterruptedException e) {
-            throw (InterruptedException) e.getCause();
-        }
-    }
-    
-    private static class UncheckedInterruptedException extends RuntimeException {
-        UncheckedInterruptedException(InterruptedException e) {
-            super(e);
         }
     }
 }

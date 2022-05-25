@@ -1,7 +1,5 @@
 package io.avery.util.concurrent;
 
-import java.util.function.Consumer;
-
 /**
  * Hacky experiment #1: Spin-loop implementation of PingPong, used to strip down the overhead of synchronization and
  * context-switching.
@@ -21,17 +19,16 @@ public class _unusedSpinPingPong<In, Out> {
     
     public class Ping {
         @SuppressWarnings("unchecked")
-        public boolean next(In item, Consumer<? super Out> action) {
+        public Out next(In item) {
             while (state == State.NEW) Thread.onSpinWait();
-            if (state == State.DONE) return false;
+            if (state == State.DONE) return null;
             // assert state == State.YIELDING;
             value = item;
             state = State.RUNNING;
             while (state == State.RUNNING) Thread.onSpinWait();
-            if (state == State.DONE) return false;
+            if (state == State.DONE) return null;
             // assert state == State.YIELDING;
-            action.accept((Out) value);
-            return true;
+            return (Out) value;
         }
     }
     
